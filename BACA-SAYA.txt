@@ -1,0 +1,5 @@
+GEMPI 3D untuk iPhone
+1. Upload seluruh isi folder "gempi" ke hosting statis (Netlify Drop, GitHub Pages, Cloudflare Pages, dll).
+2. Buka alamat https-nya di Safari di iPhone.
+3. Tekan tombol Bagikan > "Tambah ke Layar Utama".
+4. Buka dari ikon GEMPI di layar utama: tampil layar penuh dan bisa dimain offline.
