@@ -16,7 +16,9 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);font-family:
 #c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .lb{position:fixed;transform:translate(-50%,-50%);background:var(--panel);border:2px solid transparent;border-radius:10px;padding:3px 9px;font-size:12px;text-align:center;pointer-events:none;white-space:nowrap}
 .lb.on{border-color:var(--acc)}.lb b{display:block;font-size:14px}
-#top{position:fixed;left:0;right:0;top:env(safe-area-inset-top,0px);padding:8px 12px;font-size:13px;display:flex;justify-content:space-between;pointer-events:none}
+#top{position:fixed;left:0;top:env(safe-area-inset-top,0px);padding:8px 10px;font-size:13px;pointer-events:none}
+#hud{display:flex;flex-direction:column;gap:3px;background:var(--panel);border:1px solid #2c4a3c;border-radius:12px;padding:8px 11px;line-height:1.25;white-space:nowrap}
+#hud b{color:var(--acc)}#hud button{pointer-events:auto;margin-top:5px;padding:5px 10px;font-size:12px}
 #bar{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);padding:10px;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
 #msg{background:var(--panel);padding:7px 14px;border-radius:20px;font-size:14px;text-align:center}
 #btns{display:flex;gap:8px;pointer-events:auto}
@@ -40,7 +42,7 @@ tr.me td{background:rgba(242,193,78,.22);font-weight:700}.lb.me b{color:var(--ac
 #toast{position:fixed;top:22%;left:50%;transform:translateX(-50%);background:var(--acc);color:#1b1503;font-weight:700;padding:8px 18px;border-radius:20px;opacity:0;transition:opacity .25s;pointer-events:none}
 </style></head><body>
 <canvas id="c"></canvas><div id="labels"></div>
-<div id="top"><span id="tl"></span><button id="lbb" class="alt" onclick="showLB()" style="pointer-events:auto;padding:5px 10px;font-size:12px">🏆 Klasemen</button><span id="tr"></span></div>
+<div id="top"><div id="hud"><div>Ronde: <b id="hr">-</b></div><div>Dek: <b id="hd">-</b></div><div id="hk">Poin kartu: -</div><button id="lbb" class="alt" onclick="showLB()">&#127942; Klasemen</button></div></div>
 <div id="cpop">Pilih kartu untuk menutup!</div>
 <div id="toast"></div><div id="cm"></div>
 <div id="bar"><div id="msg"></div><div id="btns"><button id="bc" class="alt" disabled>TUTUP GAME</button><button id="gp" disabled style="display:none">GEMPI!</button><button class="alt" onclick="menu()">☰ Menu</button><button id="snd" class="alt" title="Suara" onclick="Snd.toggle()">&#128266;</button></div></div>
@@ -88,7 +90,7 @@ for(let s=0;s<4;s++)for(let r=2;r<=14;r++){
  m.rotation.order='YXZ';m.visible=false;scene.add(m);cards.push({r,s,mesh:m,owner:-1});}
 const deckM=new THREE.Mesh(new THREE.BoxGeometry(1,1,1.4),[edgeM,edgeM,backM,edgeM,edgeM,edgeM]);scene.add(deckM);
 const set=(c,x,y,z,rx,ry)=>{c.mesh.userData.t={x,y,z,rx,ry}};
-const pAng=i=>i*2*Math.PI/G.n;
+const pAng=i=>-i*2*Math.PI/G.n; // negative = clockwise on screen
 // ---- layout
 function layout(reveal){
  G.players.forEach((p,i)=>{const t=pAng(i),n=p.hand.length,sp=i===0?1.45:.8;
@@ -192,7 +194,8 @@ function next(){G.cur=(G.cur+1)%G.n;G.phase='draw';begin()}
 function endRound(reason){G.phase='end';G.busy=true;layout(true);
  const sc=G.players.map(p=>score(p.hand)),bn=G.players.map(()=>0);
  const bonusOK=reason==='close'&&G.drewDisc&&G.players[G.cur].hand.includes(G.takenCard)&&sc[G.cur]>=Math.max(...sc);
- if(bonusOK){bn[G.cur]+=50;if(G.takenOwner>=0)bn[G.takenOwner]-=50}
+ const tr=G.takenCard?G.takenCard.r:0,pen=tr===14?150:(tr>=11&&tr<=13?100:50);
+ if(bonusOK){bn[G.cur]+=50;if(G.takenOwner>=0)bn[G.takenOwner]-=pen}
  const cr=reason==='close'&&G.closeCard?G.closeCard.r:0,rankBonus=cr===14?150:(cr>=11&&cr<=13?100:(cr?50:0));
  if(rankBonus)bn[G.cur]+=rankBonus;
  const bf=G.players.map(p=>p.total),af=G.players.map((p,i)=>bf[i]+sc[i]+bn[i]);
@@ -200,15 +203,15 @@ function endRound(reason){G.phase='end';G.busy=true;layout(true);
  G.players.forEach((p,i)=>{p.total=rs[i]?0:af[i];p.kc=rs[i];if(rs[i])p.kcN=(p.kcN||0)+1});
  const over=G.players.some(p=>p.total>=G.target);if(over){saveRec();Snd.music(false)}
  let rows=G.players.map((p,i)=>({p,i})).sort((a,b)=>b.p.total-a.p.total).map(({p,i},r)=>`<tr${i===0?" class='me'":''}><td>${r+1}. ${p.name}${i===0?' (kamu)':''}</td><td>${p.hand.map(cn).join(' ')}</td><td>${sc[i]}${bn[i]?' ('+(bn[i]>0?'+':'')+bn[i]+')':''}</td><td><b>${p.total}</b>${rs[i]?' <span class="kc">KECEBUR!</span>':''}</td></tr>`).join('');
- let head=reason==='close'?G.players[G.cur].name+' menutup game'+(bonusOK?' dengan kartu buangan dan nilai tertinggi: +50 / −50':(G.drewDisc?' (bonus 50 tidak berlaku)':''))+(rankBonus?` · menutup dengan ${cn(G.closeCard)}: +${rankBonus} poin ekstra`:''):'Dek habis';
+ let head=reason==='close'?G.players[G.cur].name+' menutup game'+(bonusOK?' dengan kartu buangan dan nilai tertinggi: +50'+(G.takenOwner>=0?` / ${G.players[G.takenOwner].name} −${pen} (kartu ${cn(G.takenCard)} yang dibuangnya)`:''):(G.drewDisc?' (bonus 50 tidak berlaku)':''))+(rankBonus?` · menutup dengan ${cn(G.closeCard)}: +${rankBonus} poin ekstra`:''):'Dek habis';
  const kcn=G.players.filter((p,i)=>rs[i]).map(p=>p.name);
   if(kcn.length){head+=`<br><span class="kc">${kcn.join(' & ')} KECEBUR! Poin kembali ke 0</span>`;setTimeout(()=>flash(kcn.join(' & ').toUpperCase()+' KECEBUR!','kecebur',1400),300)}
   let foot;if(over){const w=G.players.slice().sort((a,b)=>b.total-a.total)[0];foot=`<h2>${w===G.players[0]?'Kamu menang!':w.name+' menang!'}</h2><button onclick="menu()">Main lagi</button>`}
  else foot='<button onclick="G.starter=(G.starter+1)%G.n;newRound()">Ronde berikutnya</button>';
  setTimeout(()=>{$('box').innerHTML=`<h2 style="margin:0">Ronde ${G.round}</h2><p>${head}</p><table><tr><th></th><th>Kartu</th><th>Ronde</th><th>Total</th></tr>${rows}</table><p>Target ${G.target} · pemain 150+ kembali ke 0 jika tersusul</p>${foot}`;$('ov').style.display='flex';ui()},1800);}
 function ui(){const p=G.players[0];let h='';
- if(p.hand.length===3)h='Kartu: '+score(p.hand);else if(p.hand.length===4)h='Terbaik setelah buang: '+bestOf(p.hand).s;
- $('tl').textContent='Ronde '+G.round+' · Dek '+G.deck.length;$('tr').textContent=h;$('bc').disabled=!(G.cur===0&&G.phase==='discard'&&!G.busy);const q=p.hand,qs=q.length===4?bestOf(q).s:score(q);$('gp').disabled=!(G.cur===0&&G.phase!=='end'&&qs>=27&&!p.gempi);$('gp').classList.toggle('fl',!$('gp').disabled);}
+ h='Poin kartu: -';if(p.hand.length===3)h='Poin kartu: '+score(p.hand);else if(p.hand.length===4)h='Poin terbaik: '+bestOf(p.hand).s;
+ $('hr').textContent=G.round;$('hd').textContent=G.deck.length;$('hk').textContent=h;$('bc').disabled=!(G.cur===0&&G.phase==='discard'&&!G.busy);const q=p.hand,qs=q.length===4?bestOf(q).s:score(q);$('gp').disabled=!(G.cur===0&&G.phase!=='end'&&qs>=27&&!p.gempi);$('gp').classList.toggle('fl',!$('gp').disabled);}
 $('gp').onclick=()=>{const h=G.players[0].hand,s=h.length===4?bestOf(h).s:score(h);if(s>=27&&!G.players[0].gempi){G.players[0].gempi=true;toast('GEMPI!');ui()}};
 $('bc').onclick=()=>{G.closing=!G.closing;$('bc').classList.toggle('on',G.closing);$('cpop').style.display=G.closing?'block':'none';msg(G.closing?'Ketuk kartu yang ingin dipakai untuk menutup game (ketuk TUTUP GAME lagi untuk batal)':'Ketuk kartu untuk membuangnya, atau tekan TUTUP GAME untuk menutup')};
 // ---- main menu
@@ -224,7 +227,7 @@ function goStart(){const nm=$('pn').value.replace(/[<>&"'`]/g,'').trim().replace
  if(!nm){$('perr').textContent='Isi namamu dulu ya.';$('pn').focus();return}
  try{localStorage.setItem('gempi_name',nm);localStorage.setItem('gempi_target',selT)}catch(e){}
  startGame(selN,nm,selT)}
-function howTo(){$('box').innerHTML=`<h2 style='margin:0 0 6px'>Cara bermain</h2><ul style='text-align:left;font-size:13px;line-height:1.6'><li>Setiap pemain memegang 3 kartu. Pada gilirannya, ambil 1 kartu dari dek atau dari kartu buangan terbuka, lalu buang 1 dari 4 kartu yang dipegang.</li><li>Nilai tanganmu dihitung dari 3 kartu terbaik: lambang sama dijumlahkan (maks 31), kartu berlambang janggal bernilai minus, dan jika tidak ada lambang yang sama, nilai dimulai dari kartu tertinggi dikurangi dua kartu lainnya. Kartu angka = nilai tertera, J/Q/K = 10, As = 11.</li><li>Saat poin di tanganmu mencapai 27 atau lebih setelah membuang kartu, status GEMPI! otomatis diucapkan untukmu (tidak perlu menekan tombol).</li><li>Ronde berakhir saat dek habis atau seseorang menutup game: tekan TUTUP GAME, lalu pilih kartu yang dipakai untuk menutup. Menutup memberi +50 untukmu dan −50 untuk pemain yang membuang kartu itu, tetapi hanya jika kartu itu kamu ambil dari buangan, tetap kamu pakai di tangan akhir, dan nilai tanganmu tertinggi di ronde itu.</li><li>Bonus kartu penutup: kartu yang kamu buang tertutup untuk menutup game memberi poin ekstra. Kartu angka +50, kartu kerajaan (J, Q, K) +100, As +150. Bonus ini terpisah dari bonus kartu buangan di atas dan bisa digabung.</li><li>Poin diakumulasi dan game berakhir saat ada yang mencapai batas skor yang dipilih sebelum main (500, 750, atau 1000). Pemain dengan poin 150 atau lebih yang tersusul oleh pemain di bawahnya akan KECEBUR! dan poinnya kembali ke 0.</li><li>Suara (efek kartu, bel, dan musik santai) bisa dimatikan dengan tombol speaker.</li></ul><button class='alt' onclick='menu()'>← Kembali</button>`}
+function howTo(){$('box').innerHTML=`<h2 style='margin:0 0 6px'>Cara bermain</h2><ul style='text-align:left;font-size:13px;line-height:1.6'><li>Setiap pemain memegang 3 kartu. Pada gilirannya, ambil 1 kartu dari dek atau dari kartu buangan terbuka, lalu buang 1 dari 4 kartu yang dipegang.</li><li>Nilai tanganmu dihitung dari 3 kartu terbaik: lambang sama dijumlahkan (maks 31), kartu berlambang janggal bernilai minus, dan jika tidak ada lambang yang sama, nilai dimulai dari kartu tertinggi dikurangi dua kartu lainnya. Kartu angka = nilai tertera, J/Q/K = 10, As = 11.</li><li>Saat poin di tanganmu mencapai 27 atau lebih setelah membuang kartu, status GEMPI! otomatis diucapkan untukmu (tidak perlu menekan tombol).</li><li>Ronde berakhir saat dek habis atau seseorang menutup game: tekan TUTUP GAME, lalu pilih kartu yang dipakai untuk menutup. Menutup memberi +50 untukmu, sedangkan pemain yang membuang kartu itu terkena pengurangan sesuai nilai kartunya (kartu angka −50, J/Q/K −100, As −150), tetapi hanya jika kartu itu kamu ambil dari buangan, tetap kamu pakai di tangan akhir, dan nilai tanganmu tertinggi di ronde itu.</li><li>Bonus kartu penutup: kartu yang kamu buang tertutup untuk menutup game memberi poin ekstra. Kartu angka +50, kartu kerajaan (J, Q, K) +100, As +150. Bonus ini terpisah dari bonus kartu buangan di atas dan bisa digabung.</li><li>Poin diakumulasi dan game berakhir saat ada yang mencapai batas skor yang dipilih sebelum main (500, 750, atau 1000). Pemain dengan poin 150 atau lebih yang tersusul oleh pemain di bawahnya akan KECEBUR! dan poinnya kembali ke 0.</li><li>Giliran bermain berputar searah jarum jam.</li><li>Suara (efek kartu, bel, dan musik santai) bisa dimatikan dengan tombol speaker.</li></ul><button class='alt' onclick='menu()'>← Kembali</button>`}
 // ---- leaderboard
 function recs(){try{return JSON.parse(localStorage.getItem('gempi_recs')||'[]')}catch(e){return[]}}
 function saveRec(){const s=G.players.map(p=>({n:p.name,t:p.total,me:p===G.players[0]})).sort((a,b)=>b.t-a.t);const rec={me:G.players[0].total,rank:s.findIndex(x=>x.me)+1,n:G.n,d:Date.now()};try{const a=recs();a.unshift(rec);localStorage.setItem('gempi_recs',JSON.stringify(a.slice(0,30)))}catch(e){}}
